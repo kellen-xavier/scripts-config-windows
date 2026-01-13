@@ -112,6 +112,40 @@
 
 ---
 
+## Testes
+
+- Instale o Pester (caso não tenha):
+
+  ```powershell
+  Install-Module Pester -Scope CurrentUser -Force
+  ```
+
+- Execute os testes:
+
+  ```powershell
+  Invoke-Pester -Path .\tests\WinSetup.Tests.ps1
+  ```
+
+## Lint / Análise Estática
+
+- Instale o PSScriptAnalyzer (caso não tenha):
+
+  ```powershell
+  Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+  ```
+
+- Rode o lint:
+
+  ```powershell
+  .\lint.ps1
+  ```
+
+  Ou diretamente:
+
+  ```powershell
+  Invoke-ScriptAnalyzer -Path . -Recurse -Severity Warning
+  ```
+
 ## Troubleshooting
 
 - Erro: winget não encontrado → Atualize o App Installer pela Microsoft Store e garanta Windows 10 1809+.
