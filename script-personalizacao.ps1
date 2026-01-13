@@ -1,54 +1,92 @@
-# Verifica permissões de administrador
-if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Host "Este script precisa ser executado como administrador." -ForegroundColor Red
-    Start-Process powershell -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -File `"" + $MyInvocation.MyCommand.Definition + "`"") -Verb RunAs
-    exit
-}
+<#
+.SYNOPSIS
+Personaliza o Windows com segurança.
+.DESCRIPTION
+Remove atalhos .lnk, define papel de parede, aplica tema rosa, e executa Win11Debloat com validação de hash. Suporta -WhatIf/-Confirm.
+.PARAMETER DebloatZipSha256
+SHA256 esperado do arquivo ZIP do Win11Debloat.
+#>
 
-# Remover todos os atalhos da área de trabalho
-Write-Host "Removendo todos os atalhos da área de trabalho..."
-Remove-Item "$env:USERPROFILE\Desktop\*" -Recurse -Force -ErrorAction SilentlyContinue
-Write-Host "Atalhos removidos com sucesso!" -ForegroundColor Green
+[CmdletBinding(SupportsShouldProcess=$true)]
+param(
+    [Parameter()] [string]$DebloatZipSha256
+)
 
-# Alterar papel de parede
-Write-Host "Alterando o papel de parede..."
-$wallpaperPath = "$PSScriptRoot\wallpaper\wallpaper-cute.jpg"
-if (Test-Path $wallpaperPath) {
-    Add-Type -TypeDefinition @"
-    using System;
-    using System.Runtime.InteropServices;
-    public class Wallpaper {
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        public static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
+Import-Module -Force "$PSScriptRoot\modules\WinSetup.psm1"
+
+try {
+    Assert-Admin
+    Write-Log -Message 'Início da personalização.' -Level Info
+
+    # Remove atalhos .lnk da área de trabalho
+    $desktop = Join-Path $env:USERPROFILE 'Desktop'
+    $shortcuts = Get-ChildItem -Path $desktop -Filter *.lnk -ErrorAction SilentlyContinue
+    if ($shortcuts) {
+        foreach ($s in $shortcuts) {
+            if ($PSCmdlet.ShouldProcess($s.FullName, 'Remover atalho')) {
+                Remove-Item $s.FullName -Force
+            }
+        }
+        Write-Host 'Atalhos removidos.' -ForegroundColor Green
     }
-"@
-    [Wallpaper]::SystemParametersInfo(20, 0, $wallpaperPath, 0x01 -bor 0x02)
-    Write-Host "Papel de parede alterado para $wallpaperPath." -ForegroundColor Green
-} else {
-    Write-Host "Arquivo de papel de parede não encontrado: $wallpaperPath" -ForegroundColor Red
+
+    # Papel de parede
+    $wallpaperPath = "$PSScriptRoot\wallpaper\wallpaper-cute.jpg"
+    if (Test-Path $wallpaperPath) {
+        Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class Wallpaper {
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    public static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
 }
+"@
+        if ($PSCmdlet.ShouldProcess($wallpaperPath, 'Definir papel de parede')) {
+            [Wallpaper]::SystemParametersInfo(20, 0, $wallpaperPath, 0x01 -bor 0x02) | Out-Null
+            Write-Host "Papel de parede alterado para $wallpaperPath." -ForegroundColor Green
+        }
+    } else {
+        Write-Host "Arquivo de papel de parede não encontrado: $wallpaperPath" -ForegroundColor Yellow
+    }
 
-# Configurar navegador padrão (Google Chrome)
-Write-Host "Definindo Google Chrome como navegador padrão..."
-Start-Process -FilePath "chrome.exe" -ArgumentList "--make-default-browser" -Wait
-Write-Host "Google Chrome definido como navegador padrão!" -ForegroundColor Green
+    # Tema rosa com backup
+    Set-AccentPinkTheme -WhatIf:$WhatIfPreference -Confirm:$ConfirmPreference
 
-# Alterar tema para rosa no Windows
-Write-Host "Alterando tema do Windows para rosa..."
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "ColorPrevalence" -Value 1
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value 1
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemUsesLightTheme" -Value 1
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "AccentColor" -Value 0xFFCDAF  # Código hexadecimal para rosa
-Write-Host "Tema rosa aplicado com sucesso!" -ForegroundColor Green
+    # Definir Chrome como navegador padrão (se instalado)
+    if (Get-WingetPackageInstalled -Id 'Google.Chrome') {
+        try {
+            if ($PSCmdlet.ShouldProcess('Google Chrome', 'Definir como navegador padrão')) {
+                Start-Process -FilePath 'chrome.exe' -ArgumentList '--make-default-browser' -Wait -NoNewWindow
+                Write-Host 'Chrome definido como navegador padrão.' -ForegroundColor Green
+            }
+        } catch {
+            Write-Log -Message "Falha ao definir Chrome padrão: $_" -Level Warn
+            Write-Host 'Não foi possível definir o Chrome como padrão automaticamente.' -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host 'Chrome não está instalado.' -ForegroundColor Yellow
+    }
 
-# Desativar aplicativos inúteis utilizando o Win11Debloat
-Write-Host "Baixando e executando o Win11Debloat para desativar aplicativos inúteis..."
-$debloatRepo = "https://github.com/Raphire/Win11Debloat/archive/refs/heads/main.zip"
-$debloatPath = "$PSScriptRoot\Win11Debloat"
-Invoke-WebRequest -Uri $debloatRepo -OutFile "$PSScriptRoot\Win11Debloat.zip"
-Expand-Archive -Path "$PSScriptRoot\Win11Debloat.zip" -DestinationPath $debloatPath -Force
-cd "$debloatPath\Win11Debloat-main"
-Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File .\Win11Debloat.ps1" -Verb RunAs -Wait
-Write-Host "Win11Debloat executado com sucesso!" -ForegroundColor Green
+    # Win11Debloat com validação
+    if ($DebloatZipSha256) {
+        Ensure-Connectivity | Out-Null
+        $zip = Join-Path $PSScriptRoot 'Win11Debloat.zip'
+        $dest = Join-Path $PSScriptRoot 'Win11Debloat'
+        $uri = 'https://github.com/Raphire/Win11Debloat/archive/refs/heads/main.zip'
+        if ($PSCmdlet.ShouldProcess($uri, 'Baixar e validar Win11Debloat')) {
+            Invoke-ValidatedDownload -Uri $uri -OutputPath $zip -ExpectedSha256 $DebloatZipSha256
+            Expand-Archive -Path $zip -DestinationPath $dest -Force
+            $scriptPath = Join-Path $dest 'Win11Debloat-main\Win11Debloat.ps1'
+            Start-Process -FilePath 'powershell.exe' -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" -Verb RunAs -Wait
+            Write-Host 'Win11Debloat executado.' -ForegroundColor Green
+        }
+    } else {
+        Write-Host 'Hash SHA256 do Win11Debloat não fornecido. Pular execução por segurança.' -ForegroundColor Yellow
+    }
 
-Write-Host "Personalização concluída com sucesso!" -ForegroundColor Cyan
+    Write-Log -Message 'Personalização concluída.' -Level Info
+} catch {
+    Write-Log -Message "Falha geral na personalização: $_" -Level Error
+    Write-Error $_
+    exit 1
+}

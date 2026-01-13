@@ -48,17 +48,18 @@
 
 ## Pré-requisitos
 
-1. **Sistema Operacional:** Windows 10 ou 11.
-2. **Permissões de Administrador:**
+1. **Sistema Operacional:** Windows 10 (1809+) ou Windows 11.
+2. **App Installer:** Deve estar atualizado para habilitar o winget.
+3. **Permissões de Administrador:**
    - Todos os scripts precisam ser executados com permissões administrativas.
-3. **PowerShell:** Versão 5.1 ou superior.
-4. **Configuração do Execution Policy:** Certifique-se de que o PowerShell permite a execução de scripts:
+4. **PowerShell:** Versão 5.1 ou superior.
+5. **Configuração do Execution Policy:** Certifique-se de que o PowerShell permite a execução de scripts:
 
    ```powershell
    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
    ```
 
-5. **Requisitos Específicos do Script de Personalização:**
+6. **Requisitos Específicos do Script de Personalização:**
    - Coloque o seu papel de parede na pasta `wallpaper`, localizada no mesmo diretório do script. O arquivo deve se chamar `wallpaper-cute.jpg`.
 
 ## Como Executar os Scripts
@@ -86,7 +87,7 @@
 - Para instalar aplicativos:
 
   ```powershell
-  .\script-instalar-aplicativos.ps1
+  .\programas-new-apps.ps1
   ```
 
 - Para configurar o ambiente de desenvolvimento:
@@ -110,6 +111,12 @@
 - Após a execução dos scripts, reiniciar o sistema pode ser necessário para aplicar todas as configurações.
 
 ---
+
+## Troubleshooting
+
+- Erro: winget não encontrado → Atualize o App Installer pela Microsoft Store e garanta Windows 10 1809+.
+- Falha de conectividade → Verifique acesso a github.com e proxies/VPN.
+- Execução bloqueada → Ajuste o Execution Policy conforme seção de Pré-requisitos.
 
 ## Suporte
 
