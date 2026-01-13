@@ -1,0 +1,15 @@
+# Logs
+*. log
+logs/
+
+# Temporary files
+*.tmp
+*.zip
+Win11Debloat/
+
+# Backups
+backup/
+
+# User-specific
+wallpaper/*. jpg
+wallpaper/*.png
